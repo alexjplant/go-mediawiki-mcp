@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Server",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/server/main.go",
+      "args": [],
+      "env": {},
+      "showLog": true,
+      "trace": "log"
+    },
+    {
+      "name": "Debug Server (Custom API URL)",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/server/main.go",
+      "args": [
+        "-api-url=https://wiki.fractalaudio.com/wiki/api.php"
+      ],
+      "env": {},
+      "showLog": true,
+      "trace": "log"
+    }
+  ]
+}
+

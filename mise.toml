@@ -4,11 +4,14 @@ node = "25.1.0"
 "npm:wrangler" = "4.45.4"
 
 [tasks]
+[tasks."dev"]
+run = "go run ./cmd/server/main.go"
+
 [tasks."cloudflare:build"]
 run = "go run github.com/syumai/workers/cmd/workers-assets-gen -mode=go && GOOS=js GOARCH=wasm go build -o ./build/app.wasm ./cmd/cloudflare/main.go"
 
 [tasks."cloudflare:deploy"]
-run = "wrangler deploy"
+run = "wrangler deploy -c ./wranger.jsonc"
 
 [tasks."cloudflare:dev"]
 run = "wrangler dev -c ./wranger.jsonc"

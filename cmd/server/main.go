@@ -22,5 +22,5 @@ func main() {
 	}
 
 	http.Handle("/mcp", server.HTTPHandler())
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8787", nil))
 }

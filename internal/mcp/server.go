@@ -91,7 +91,19 @@ func convertContent(content []*mcp_golang.Content) []map[string]interface{} {
 			"type": c.Type,
 		}
 		if c.TextContent != nil {
-			item["text"] = c.TextContent.Text
+			text := c.TextContent.Text
+			var jsonData interface{}
+			if json.Unmarshal([]byte(text), &jsonData) == nil {
+				item["json"] = jsonData
+			} else {
+				item["text"] = text
+			}
+		}
+		if c.ImageContent != nil {
+			item["image"] = c.ImageContent
+		}
+		if c.EmbeddedResource != nil {
+			item["resource"] = c.EmbeddedResource
 		}
 		result[i] = item
 	}
@@ -129,6 +141,40 @@ func (s *Server) handleCallTool(req map[string]interface{}) (map[string]interfac
 		}, nil
 	}
 
+	if name == "get_toc" {
+		title, ok := arguments["title"].(string)
+		if !ok {
+			return nil, fmt.Errorf("missing title argument")
+		}
+		result, err := s.handleGetTOC(GetTOCArguments{Title: title})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"content": convertContent(result.Content),
+			"isError": false,
+		}, nil
+	}
+
+	if name == "get_section" {
+		title, ok := arguments["title"].(string)
+		if !ok {
+			return nil, fmt.Errorf("missing title argument")
+		}
+		sectionIndex, ok := arguments["section_index"].(float64)
+		if !ok {
+			return nil, fmt.Errorf("missing section_index argument")
+		}
+		result, err := s.handleGetSection(GetSectionArguments{Title: title, SectionIndex: int(sectionIndex)})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"content": convertContent(result.Content),
+			"isError": false,
+		}, nil
+	}
+
 	return nil, fmt.Errorf("unknown tool: %s", name)
 }
 
@@ -147,6 +193,38 @@ func (s *Server) handleListTools() map[string]interface{} {
 						},
 					},
 					"required": []string{"title"},
+				},
+			},
+			{
+				"name":        "get_toc",
+				"description": "Get the table of contents (TOC) for a MediaWiki page as a JSON object",
+				"inputSchema": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"title": map[string]interface{}{
+							"type":        "string",
+							"description": "The title of the page to get the TOC for",
+						},
+					},
+					"required": []string{"title"},
+				},
+			},
+			{
+				"name":        "get_section",
+				"description": "Get a specific section from a MediaWiki page",
+				"inputSchema": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"title": map[string]interface{}{
+							"type":        "string",
+							"description": "The title of the page",
+						},
+						"section_index": map[string]interface{}{
+							"type":        "integer",
+							"description": "The index of the section to retrieve (0-based)",
+						},
+					},
+					"required": []string{"title", "section_index"},
 				},
 			},
 		},
@@ -180,4 +258,42 @@ func (s *Server) handleGetPage(arguments GetPageArguments) (*mcp_golang.ToolResp
 
 	result := fmt.Sprintf("Title: %s\nLast Edited: %s\n\n%s", arguments.Title, timestamp, content)
 	return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(result)), nil
+}
+
+type GetTOCArguments struct {
+	Title string `json:"title" jsonschema:"required,description=The title of the page to get the TOC for"`
+}
+
+func (s *Server) handleGetTOC(arguments GetTOCArguments) (*mcp_golang.ToolResponse, error) {
+	sections, err := s.mwClient.GetTOC(arguments.Title)
+	if err != nil {
+		return mcp_golang.NewToolResponse(
+			mcp_golang.NewTextContent(fmt.Sprintf("Error retrieving TOC: %v", err)),
+		), nil
+	}
+
+	tocJSON, err := json.Marshal(sections)
+	if err != nil {
+		return mcp_golang.NewToolResponse(
+			mcp_golang.NewTextContent(fmt.Sprintf("Error marshaling TOC: %v", err)),
+		), nil
+	}
+
+	return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(string(tocJSON))), nil
+}
+
+type GetSectionArguments struct {
+	Title        string `json:"title" jsonschema:"required,description=The title of the page"`
+	SectionIndex int    `json:"section_index" jsonschema:"required,description=The index of the section to retrieve (0-based)"`
+}
+
+func (s *Server) handleGetSection(arguments GetSectionArguments) (*mcp_golang.ToolResponse, error) {
+	content, err := s.mwClient.GetSection(arguments.Title, arguments.SectionIndex)
+	if err != nil {
+		return mcp_golang.NewToolResponse(
+			mcp_golang.NewTextContent(fmt.Sprintf("Error retrieving section: %v", err)),
+		), nil
+	}
+
+	return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(content)), nil
 }
